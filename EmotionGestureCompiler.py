@@ -5,6 +5,7 @@ import torch
 
 from emotion_detector import EmotionDetector
 from imutils.video import FPS
+from pandas import DataFrame
 
 class EmotionGestureCompiler(EmotionDetector):
     def __init__(
@@ -25,14 +26,49 @@ class EmotionGestureCompiler(EmotionDetector):
         num_faces=num_faces,
         )
 
-        self.skeleton = mp.solutions.pose
+        self.skeleton = mp.solutions.pose   # skeleton
+        self.skeleton_landmarks = DataFrame(
+            columns = ['x', 'y', 'z'],
+            index = ['nose', 'Lsho', 'Rsho', 'Lelb', 'Relb', 'Lwri', 'Rwri']
+        ).applymap(lambda x:0)
+
+    def cap_landmarks (self, detection):
+        # simplifications
+        landmark = detection.pose_landmarks.landmark
+        m = mp.solutions.pose.PoseLandmark
+        memb = [m.NOSE, m.LEFT_SHOULDER, m.RIGHT_SHOULDER, m.LEFT_ELBOW, m.RIGHT_ELBOW, m.LEFT_WRIST, m.RIGHT_WRIST]
+        
+        # saves landmarks on DataFrame
+        for i in range(len(self.skeleton_landmarks)):
+            self.skeleton_landmarks.iloc[i] = [landmark[memb[i]].x, landmark[memb[i]].y, landmark[memb[i]].z]
+        
+        return
+    
+    def print_landmarks (self, image):
+        # print parameters
+        font = cv2.FONT_HERSHEY_DUPLEX
+        size = 0.7
+        color = (0, 255, 0)
+        thickness = 1
+
+        # print on image
+        for i in range(len(self.skeleton_landmarks)):
+            text = [self.skeleton_landmarks.iloc[i][j] for j in range(len(self.skeleton_landmarks.iloc[i]))]
+            
+            cv2.putText(
+                image,
+                f'{self.skeleton_landmarks.index[i]}   {list(map(lambda x : round(x, 3), text))}',
+                (0, round((1 + i)*size*45)),
+                font, size, color, thickness
+            )
+        return
         
     def video (self, video_path: str = 0):
         
         if video_path == "realsense":
             video_path = "v4l2src device=/dev/video2 ! video/x-raw, width=640, height=480 ! videoconvert ! video/x-raw,format=BGR ! appsink"
 
-        cap = cv2.VideoCapture(video_path)
+        cap = cv2.VideoCapture(video_path)      # video capture
         if not cap.isOpened():
             print("Error opening video stream or file")
             return
@@ -46,11 +82,20 @@ class EmotionGestureCompiler(EmotionDetector):
 
                 # facial detection
                 self.process_frame()
+
+                # movimente detection
+                try:
+                    detection = pose.process(self.img)
+                    self.cap_landmarks(detection)
+                except:
+                    pass
+
+                self.print_landmarks(self.img)
                 
                 # draw skeleton
                 mp.solutions.drawing_utils.draw_landmarks(
                     self.img,
-                    pose.process(self.img).pose_landmarks,
+                    detection.pose_landmarks,
                     mp.solutions.pose.POSE_CONNECTIONS,
                     mp.solutions.drawing_styles.get_default_pose_landmarks_style()
                 )
