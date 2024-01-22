@@ -17,7 +17,7 @@ def extract_features(data):
 
 #%%
 class GestureDetector:
-    def __init__(self, gestures:list):
+    def __init__(self, gestures:list, train_path:str):
 
         self.gesture_name = gestures    # all gestures and their names
         self.gesture_counter = {i : 0 for i in self.gesture_name}
@@ -30,9 +30,10 @@ class GestureDetector:
 
         # Criar classificador KNN com k = 5 (numero de vizinhos)
         self.knn_classifier = KNeighborsClassifier(n_neighbors=5, weights='distance', algorithm='auto')
+        self.train_xlsx(train_path)
         return
     
-    def train_xlsx (self, trainData_path):
+    def train_xlsx (self, trainData_path:str):
         X = []  # train data
         Y = []  # target values
 
@@ -47,12 +48,8 @@ class GestureDetector:
         self.knn_classifier.fit(X, Y)
         return
 
-    def classify_xlsx(self, validation_path, threshold=0.9, trainData_path = ''):
+    def classify_xlsx(self, validation_path:str, threshold:float=0.9):
         # Função para classificar um novo arquivo xlsx
-
-        # train data if given path
-        if trainData_path != '':
-            self.train_xlsx(trainData_path)
 
         # getes results
         for file in get_allFiles(validation_path):
@@ -84,5 +81,5 @@ if __name__ == "__main__":
         'aleatorio/Base_de_dados_20_2',
         'validar_pa/validar_30_2'
     ]
-    G = GestureDetector(['A', 'B', 'C', 'D', 'E'])
-    G.classify_xlsx(data_directory[1], trainData_path=data_directory[0])
+    G = GestureDetector(['A', 'B', 'C', 'D', 'E'], data_directory[0])
+    G.classify_xlsx(data_directory[1])

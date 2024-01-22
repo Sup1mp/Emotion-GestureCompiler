@@ -4,10 +4,11 @@ import numpy as np
 import torch
 
 from emotion_detector import EmotionDetector
+from GestureDetector import GestureDetector
 from imutils.video import FPS
 from pandas import DataFrame
 
-class EmotionGestureCompiler(EmotionDetector):
+class EmotionGestureCompiler:
     def __init__(
         self,
         model_name: str = "resnet18.onnx",
@@ -16,21 +17,18 @@ class EmotionGestureCompiler(EmotionDetector):
         providers: int = 1,
         fp16=False,
         num_faces=None,
+        train_path: str = 'aleatorio/Base_de_dados_20_2'
     ):
-        super().__init__(
-        model_name = model_name,
-        model_option = model_option,
-        backend_option = backend_option,
-        providers = providers,
-        fp16=fp16,
-        num_faces=num_faces,
-        )
+        self.Emotion = EmotionDetector(model_name, model_option, backend_option, providers, fp16, num_faces)
+        self.Gesture = GestureDetector(['A', 'B', 'C', 'D', 'E'], train_path)
 
-        self.skeleton = mp.solutions.pose   # skeleton
-        self.skeleton_landmarks = DataFrame(
+        self.skeleton = mp.solutions.pose       # skeleton
+        self.skeleton_landmarks = DataFrame(    # landmarks
             columns = ['x', 'y', 'z'],
             index = ['nose', 'Lsho', 'Rsho', 'Lelb', 'Relb', 'Lwri', 'Rwri']
         ).applymap(lambda x:0)
+        
+        return
 
     def cap_landmarks (self, detection):
         # simplifications
@@ -81,17 +79,18 @@ class EmotionGestureCompiler(EmotionDetector):
             while success:
 
                 # facial detection
-                self.process_frame()
+                self.Emotion.process_frame()
 
                 # movimente detection
+                detection = pose.process(self.img)
+                
                 try:
-                    detection = pose.process(self.img)
                     self.cap_landmarks(detection)
                 except:
-                    pass
+                    print('Could not capture skeleton properly')
 
                 self.print_landmarks(self.img)
-                
+
                 # draw skeleton
                 mp.solutions.drawing_utils.draw_landmarks(
                     self.img,
@@ -100,7 +99,7 @@ class EmotionGestureCompiler(EmotionDetector):
                     mp.solutions.drawing_styles.get_default_pose_landmarks_style()
                 )
                 
-                cv2.imshow("Capturing", self.img)
+                cv2.imshow("Capturing", self.img)   # draw image
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
                 fps.update()
