@@ -61,6 +61,7 @@ class EmotionDetector:
             providers=providers if model_option == "onnx" else None,
             fp16=fp16
         )
+        self.img = 0
 
     def load_face_model(self, backend_option: int) -> cv2.dnn_Net:
         """
@@ -185,8 +186,8 @@ class EmotionDetector:
             img_name (str): The path to the input image file.
         """
         self.img = cv2.imread(img_name)
-        self.height, self.width = self.img.shape[:2]
-        self.process_frame()
+        #self.height, self.width = self.img.shape[:2]
+        self.process_frame(self.img)
         cv2.imshow("Output", self.img)
         cv2.waitKey(0)
 
@@ -213,13 +214,13 @@ class EmotionDetector:
             return
 
         success, self.img = cap.read()
-        self.height, self.width = self.img.shape[:2]
+        #self.height, self.width = self.img.shape[:2]
 
         fps = FPS().start()
 
         while success:
             try:
-                self.process_frame()
+                self.process_frame(self.img)
                 if display_window:
                     cv2.imshow("Output", self.img)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -239,12 +240,14 @@ class EmotionDetector:
         cap.release()
         cv2.destroyAllWindows()
 
-    def process_frame(self) -> None:
+    def process_frame(self, img) -> None:
         """
         Processes the current frame, detects faces, and recognizes emotions.
         """
+        height, width = img.shape[:2]
+
         blob = cv2.dnn.blobFromImage(
-            cv2.resize(self.img, (300, 300)),
+            cv2.resize(img, (300, 300)),
             1.0,
             (300, 300),
             (104.0, 177.0, 123.0),
@@ -262,22 +265,22 @@ class EmotionDetector:
 
                 if prediction_1 > 0.5 and prediction_2 > 0.5:
                     bbox_1 = predictions[0, 0, 0, 3:7] * np.array(
-                        [self.width, self.height, self.width, self.height]
+                        [width, height, width, height]
                     )
                     bbox_2 = predictions[0, 0, 1, 3:7] * np.array(
-                        [self.width, self.height, self.width, self.height]
+                        [width, height, width, height]
                     )
                     (x_min_1, y_min_1, x_max_1, y_max_1) = bbox_1.astype("int")
                     (x_min_2, y_min_2, x_max_2, y_max_2) = bbox_2.astype("int")
                     cv2.rectangle(
-                        self.img, (x_min_1, y_min_1), (x_max_1, y_max_1), (0, 0, 255), 2
+                        img, (x_min_1, y_min_1), (x_max_1, y_max_1), (0, 0, 255), 2
                     )
                     cv2.rectangle(
-                        self.img, (x_min_2, y_min_2), (x_max_2, y_max_2), (0, 0, 255), 2
+                        img, (x_min_2, y_min_2), (x_max_2, y_max_2), (0, 0, 255), 2
                     )
 
-                    face_1 = self.img[y_min_1:y_max_1, x_min_1:x_max_1]
-                    face_2 = self.img[y_min_2:y_max_2, x_min_2:x_max_2]
+                    face_1 = img[y_min_1:y_max_1, x_min_1:x_max_1]
+                    face_2 = img[y_min_2:y_max_2, x_min_2:x_max_2]
 
                     emotion_1 = self.recognize_emotion(face_1)
                     emotion_2 = self.recognize_emotion(face_2)
@@ -286,7 +289,7 @@ class EmotionDetector:
                         self.bbox_predictions["bbox_left"].append(emotion_1)
                         self.bbox_predictions["bbox_right"].append(emotion_2)
                         cv2.putText(
-                            self.img,
+                            img,
                             EmotionDetector.EMOTIONS[emotion_1],
                             (x_min_1 + 5, y_min_1 - 20),
                             cv2.FONT_HERSHEY_SIMPLEX,
@@ -296,7 +299,7 @@ class EmotionDetector:
                             cv2.LINE_AA,
                         )
                         cv2.putText(
-                            self.img,
+                            img,
                             EmotionDetector.EMOTIONS[emotion_2],
                             (x_min_2 + 5, y_min_2 - 20),
                             cv2.FONT_HERSHEY_SIMPLEX,
@@ -309,7 +312,7 @@ class EmotionDetector:
                         self.bbox_predictions["bbox_left"].append(emotion_2)
                         self.bbox_predictions["bbox_right"].append(emotion_1)
                         cv2.putText(
-                            self.img,
+                            img,
                             EmotionDetector.EMOTIONS[emotion_2],
                             (x_min_2 + 5, y_min_2 - 20),
                             cv2.FONT_HERSHEY_SIMPLEX,
@@ -319,7 +322,7 @@ class EmotionDetector:
                             cv2.LINE_AA,
                         )
                         cv2.putText(
-                            self.img,
+                            img,
                             EmotionDetector.EMOTIONS[emotion_1],
                             (x_min_1 + 5, y_min_1 - 20),
                             cv2.FONT_HERSHEY_SIMPLEX,
@@ -337,19 +340,19 @@ class EmotionDetector:
             for i in range(predictions.shape[2]):
                 if predictions[0, 0, i, 2] > 0.5:
                     bbox = predictions[0, 0, i, 3:7] * np.array(
-                        [self.width, self.height, self.width, self.height]
+                        [width, height, width, height]
                     )
                     (x_min, y_min, x_max, y_max) = bbox.astype("int")
                     cv2.rectangle(
-                        self.img, (x_min, y_min), (x_max, y_max), (0, 0, 255), 2
+                        img, (x_min, y_min), (x_max, y_max), (0, 0, 255), 2
                     )
 
-                    face = self.img[y_min:y_max, x_min:x_max]
+                    face = img[y_min:y_max, x_min:x_max]
 
                     emotion = self.recognize_emotion(face)
 
                     cv2.putText(
-                        self.img,
+                        img,
                         EmotionDetector.EMOTIONS[emotion],
                         (x_min + 5, y_min - 20),
                         cv2.FONT_HERSHEY_SIMPLEX,
@@ -358,3 +361,5 @@ class EmotionDetector:
                         1,
                         cv2.LINE_AA,
                     )
+
+        return img
