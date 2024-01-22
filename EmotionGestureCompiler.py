@@ -111,7 +111,3 @@ class EmotionGestureCompiler(EmotionDetector):
         cv2.destroyAllWindows()
         return
 
-if __name__ == "__main__":
-    emo = EmotionGestureCompiler()
-    emo.video(0)
-
