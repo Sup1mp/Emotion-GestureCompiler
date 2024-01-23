@@ -26,7 +26,6 @@ class GestureDetector:
             train_path:str,
             k:int = 5
     ):
-
         self.gesture_name = gestures    # all gestures and their names
 
         # Criar classificador KNN com k = 5 (numero de vizinhos)
@@ -37,14 +36,16 @@ class GestureDetector:
         self.frames = []        # frames of the video (list of dataframes)
         self.frame_size = 10    # max size of video in frames
 
-        # pd.DataFrame(
-        #     [np.array([landmark[i].x, landmark[i].y, landmark[i].z]) for i in memb],
-        #     columns = ['x', 'y', 'z'],
-        #     index = ['nose', 'Lsho', 'Rsho', 'Lelb', 'Relb', 'Lwri', 'Rwri']
-        # )
-
-        self.train_xlsx(train_path)
+        self.train_xlsx(train_path) # train KNN
         return
+    
+    def rawData2dataFrame (self):
+        # method of visualizing how data is organied
+        return [pd.DataFrame(
+            self.frames[i],
+            columns = ['x', 'y', 'z'],
+            index = ['nose', 'Lsho', 'Rsho', 'Lelb', 'Relb', 'Lwri', 'Rwri']
+        ) for i in range(self.frames)]
     
     def cap_landmarks (self, new_frame):
 
@@ -76,19 +77,18 @@ class GestureDetector:
         if video_path == "realsense":
             video_path = "v4l2src device=/dev/video2 ! video/x-raw, width=640, height=480 ! videoconvert ! video/x-raw,format=BGR ! appsink"
 
-        cap = cv2.VideoCapture(video_path)
+        cap = cv2.VideoCapture(video_path)  # video inicialization
         if not cap.isOpened():
             return
 
+        # video reading
         success, img = cap.read()
-        #self.height, self.width = self.img.shape[:2]
         fps = FPS().start()
 
         # image processing
         while success:
 
-            self.video_cap(img)
-            print(self.frames)
+            self.video_cap(img) # store frames
 
             cv2.imshow("Output", img)
             if cv2.waitKey(1) & 0xFF == ord("q"):
