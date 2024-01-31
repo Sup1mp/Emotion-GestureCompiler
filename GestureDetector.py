@@ -174,7 +174,7 @@ class GestureDetector:
 
             # resets matrix
             if not self.recording:
-                self.matrix = np.zeros((1,18))
+                self.reset_pred()
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -185,6 +185,11 @@ class GestureDetector:
         fps.stop()
         cap.release()
         cv2.destroyAllWindows()
+        return
+    
+    def reset_pred (self):
+        self.matrix = np.zeros((1,18))
+        self.resp = "??"
         return
 
     def print_data (self, image):
@@ -291,6 +296,9 @@ class GestureDetector:
         # organizes and saves
         df = pd.DataFrame(self.matrix, columns= self.name_order)
         df.to_excel(file_name, index=False, engine='openpyxl')
+
+        # resets matrix 
+        self.reset_pred()
         
         print(f"Arquivo {file_name} salvo.")
         
