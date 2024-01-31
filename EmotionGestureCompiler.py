@@ -17,7 +17,7 @@ class EmotionGestureCompiler:
         providers: int = 1,
         fp16=False,
         num_faces=None,
-        train_path: str = 'aleatorio/Base_de_dados_20_2'
+        train_path: str = 'Base_de_dados'
     ):
         self.Emotion = EmotionDetector(model_name, model_option, backend_option, providers, fp16, num_faces)
         self.Gesture = GestureDetector(['A', 'B', 'C', 'D', 'E'], train_path)
@@ -37,35 +37,17 @@ class EmotionGestureCompiler:
         success, img = cap.read()
         fps = FPS().start()
 
-        with self.Gesture.skeleton.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
-            while success:
+        while success:
 
-                # facial detection
-                self.Emotion.process_frame(img)
-
-                # movimente detection
-                detection = pose.process(img)
-
-                try:
-                    self.Gesture.cap_landmarks(detection)
-                except:
-                    print('Could not capture skeleton properly')
-
-                # self.print_landmark_data(img)
-
-                # draw skeleton
-                mp.solutions.drawing_utils.draw_landmarks(
-                    img,
-                    detection.pose_landmarks,
-                    mp.solutions.pose.POSE_CONNECTIONS,
-                    mp.solutions.drawing_styles.get_default_pose_landmarks_style()
-                )
-                
-                cv2.imshow("Capturing", img)   # draw image
-                if cv2.waitKey(1) & 0xFF == ord("q"):
-                    break
-                fps.update()
-                success, img = cap.read()
+            # facial detection
+            self.Emotion.process_frame(img)
+            self.Gesture.process_frame(img)
+            
+            cv2.imshow("Capturing", img)   # draw image
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
+            fps.update()
+            success, img = cap.read()
             
         fps.stop()
         cap.release()
