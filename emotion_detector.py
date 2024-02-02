@@ -45,7 +45,7 @@ class EmotionDetector:
             use_cuda (bool, optional): Whether to use CUDA for faster processing if a GPU is available. Default is cuda if CUDA is available, otherwise cpu.
             backend_option (int, optional): Backend option for OpenCV's DNN module. Default is 0 if CUDA is available, otherwise 1.
         """
-        self.logger = setup_logger()
+        self.logger = setup_logger(__name__)
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model_option = model_option

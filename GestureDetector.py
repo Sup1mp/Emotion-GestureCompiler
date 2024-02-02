@@ -9,6 +9,7 @@ import mediapipe as mp
 from utils.Mconfusao import Mconfusao
 from sklearn.neighbors import KNeighborsClassifier
 from imutils.video import FPS
+from utils.utils import setup_logger
 
 #%%
 # Calculate the angle between three points
@@ -26,20 +27,6 @@ def calculate_angle(a, b, c):
 # função que retorna todos os dados de um diretório
 def get_allFiles (data_directory):
     return [f for f in os.listdir(data_directory) if f.endswith('.xlsx')]
-
-def get_trainData (trainData_path):
-    X = []  # train data
-    Y = []  # target values
-
-    for file in get_allFiles(trainData_path):
-        # colect the data
-        dados = pd.read_excel(os.path.join(trainData_path, file)).to_numpy()
-        
-        # saves in array-like
-        X.append(extract_features(dados))
-        Y.append(file.split('_')[0])    # awnser in the name of the file
-    
-    return X, Y
 
 # Função para extrair as features dos dados
 def extract_features(data):
@@ -61,6 +48,7 @@ class GestureDetector:
         self.start_time = time.time()
         self.matrix = np.zeros((1,18))  # matrix with data from many frames
         self.resp = '??'                # current awnser
+        self.logger = setup_logger(__name__)
 
         self.file_counter = {}
         self.name_order = [
@@ -104,8 +92,12 @@ class GestureDetector:
         # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
         # simplifications
-        landmark = self.detection.pose_landmarks.landmark
-        m = mp.solutions.pose.PoseLandmark
+        try:
+            landmark = self.detection.pose_landmarks.landmark
+            m = mp.solutions.pose.PoseLandmark
+        except:
+            return 0
+        
         memb = [
             m.RIGHT_SHOULDER,
             m.LEFT_SHOULDER,
@@ -129,27 +121,31 @@ class GestureDetector:
 
         # MAKE DETECTION
         vector = self.cap_landmarks(img)  # vector of current frame
-
+        
         # prints results
         if self.video:
             img = self.print_data(img)
-        
-        if not self.recording:
-            angle = calculate_angle(vector[0,3:5], vector[0,9:11], vector[0,15:17])
+        try:
+            if not self.recording:
+                angle = calculate_angle(vector[0,3:5], vector[0,9:11], vector[0,15:17])
 
-            if angle < 70 and vector[0,16] < vector[0,4]:
-                self.recording = True   # ready for recording
-                time.sleep(3)
-                self.start_time = time.time()
+                if angle < 70 and vector[0,16] < vector[0,4]:
+                    self.recording = True   # ready for recording
+                    self.logger.info("Record Starts")
+                    #time.sleep(3)
+                    self.start_time = time.time()
 
-        elif self.recording and time.time() - self.start_time < 2:
-            # records for 2 seconds
-            self.matrix = np.concatenate((self.matrix,vector),0)
+            elif self.recording and time.time() - self.start_time < 2:
+                # records for 2 seconds
+                self.matrix = np.concatenate((self.matrix,vector),0)
 
-        else:
-            self.recording = False  # stops recoding
-            self.matrix = np.concatenate((self.matrix[1:, :],vector),0)
-            self.resp = self.classify_video(self.matrix)
+            else:
+                self.recording = False  # stops recoding
+                self.matrix = np.concatenate((self.matrix[1:, :],vector),0)
+                self.resp = self.classify_video(self.matrix)
+                self.logger.info("Record Ends")
+        except:
+            pass
 
         return img
 
@@ -202,20 +198,23 @@ class GestureDetector:
         thickness = 1
         circular_radius = 2
 
-         # RENDER DETECTIONS
-        mp.solutions.drawing_utils.draw_landmarks(
-            image,
-            self.detection.pose_landmarks,
-            mp.solutions.pose.POSE_CONNECTIONS,
-            mp.solutions.drawing_utils.DrawingSpec(
-                color=color_1,
-                thickness=thickness,
-                circle_radius=circular_radius),
-            mp.solutions.drawing_utils.DrawingSpec(
-                color=color_2,
-                thickness=thickness,
-                circle_radius=circular_radius)
-        )
+        try:
+            # RENDER DETECTIONS
+            mp.solutions.drawing_utils.draw_landmarks(
+                image,
+                self.detection.pose_landmarks,
+                mp.solutions.pose.POSE_CONNECTIONS,
+                mp.solutions.drawing_utils.DrawingSpec(
+                    color=color_1,
+                    thickness=thickness,
+                    circle_radius=circular_radius),
+                mp.solutions.drawing_utils.DrawingSpec(
+                    color=color_2,
+                    thickness=thickness,
+                    circle_radius=circular_radius)
+            )
+        except:
+            pass
 
         # render results
         cv2.putText(
@@ -297,10 +296,10 @@ class GestureDetector:
         df = pd.DataFrame(self.matrix, columns= self.name_order)
         df.to_excel(file_name, index=False, engine='openpyxl')
 
+        self.logger.info(f"File {file_name} saved sucessefuly!")
+
         # resets matrix 
         self.reset_pred()
-        
-        print(f"Arquivo {file_name} salvo.")
         
 #%%
 if __name__ == "__main__":

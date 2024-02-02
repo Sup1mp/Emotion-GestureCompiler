@@ -5,6 +5,7 @@ import torch
 from emotion_detector import EmotionDetector
 from GestureDetector import GestureDetector
 from imutils.video import FPS
+from utils.utils import setup_logger
 
 class EmotionGestureCompiler:
     def __init__(
@@ -21,6 +22,8 @@ class EmotionGestureCompiler:
     ):
         self.gestures_list = ['A', 'B', 'C', 'D', 'E']
         self.emotions_list = {0: "BAD", 1: "GOOD", 2: "NEUTRAL"}
+
+        self.logger = setup_logger(__name__)
         
         self.Emotion = EmotionDetector(model_name, model_option, backend_option, providers, fp16, num_faces)
         self.Gesture = GestureDetector(self.gestures_list, train_path, k, video)
@@ -71,17 +74,21 @@ class EmotionGestureCompiler:
                     1,
                     cv2.LINE_AA,
                 )
+        try:
+            return img, emotion
+        except:
+            return img, 0
 
-        return emotion, img
-
-    def video (self, video_path: str = 0):
+    def video (self, video_path: str):
         
         if video_path == "realsense":
             video_path = "v4l2src device=/dev/video2 ! video/x-raw, width=640, height=480 ! videoconvert ! video/x-raw,format=BGR ! appsink"
+        
+        self.logger.info(f"video Path: {video_path}")
 
         cap = cv2.VideoCapture(video_path)      # creates capture
         if not cap.isOpened():
-            print("Error opening video stream or file")
+            self.logger.error("Error opening video stream or file")
             return
 
         # image reading
@@ -91,36 +98,43 @@ class EmotionGestureCompiler:
         # starts video
         while success:
 
-            emotion, img = self.get_emotion(img)    # captures emotion
+            try:
+                img, emotion = self.get_emotion(img)    # captures emotion
 
-            if not self.Gesture.resp in self.gestures_list:
-                img = self.Gesture.process_frame(img)   # captures gesture
+                if not self.Gesture.resp in self.gestures_list:
+                    img = self.Gesture.process_frame(img)   # captures gesture
 
-            else:
-                # match predictions at will
-                match self.emotions_list[emotion]:
-                    case "GOOD":        # confirms prediction
-                        #self.Gesture.saves_to_dataBase()
-                        print("BOM GAROTO")
+                else:
+                    # match predictions at will
+                    match self.emotions_list[emotion]:
+                        case "GOOD":        # confirms prediction
+                            #self.Gesture.saves_to_dataBase()
+                            print("BOM GAROTO")
 
-                    case "BAD":         # rejects prediction
-                        self.Gesture.reset_pred()
-                        print("MAU GAROTO")
+                        case "BAD":         # rejects prediction
+                            self.Gesture.reset_pred()
+                            print("MAU GAROTO")
 
-                    case "NEUTRAL":     # does nothing (indecision/analysin)
-                        print("GAROTO NEUTRO")
-                        pass
+                        case "NEUTRAL":     # does nothing (indecision/analysin)
+                            print("GAROTO NEUTRO")
+                            pass
 
-            cv2.imshow("Capturing", img)   # draw image
-            if cv2.waitKey(1) & 0xFF == ord("q"):
+                cv2.imshow("Capturing", img)   # draw image
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    break
+
+                # image update
+                fps.update()
+                success, img = cap.read()
+
+            except KeyboardInterrupt:
                 break
-
-            # image update
-            fps.update()
-            success, img = cap.read()
         
         # ends transmition
         fps.stop()
+        self.logger.info("Elapsed time: %.2f", fps.elapsed())
+        self.logger.info("Approx. FPS: %.2f", fps.fps())
+
         cap.release()
         cv2.destroyAllWindows()
         return
