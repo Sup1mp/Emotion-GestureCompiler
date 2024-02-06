@@ -110,14 +110,12 @@ class EmotionGestureCompiler:
                         case "GOOD":        # confirms prediction
                             #self.Gesture.saves_to_dataBase()
                             print("BOM GAROTO")
+                            self.Gesture.reset_pred()
 
                         case "BAD":         # rejects prediction
                             self.Gesture.reset_pred()
                             print("MAU GAROTO")
 
-                        case "NEUTRAL":     # does nothing (indecision/analysin)
-                            print("GAROTO NEUTRO")
-                            pass
 
                 cv2.imshow("Capturing", img)   # draw image
                 if cv2.waitKey(1) & 0xFF == ord("q"):

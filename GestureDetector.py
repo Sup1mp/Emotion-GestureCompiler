@@ -219,7 +219,7 @@ class GestureDetector:
         # render results
         cv2.putText(
             image,
-            f'Predic.: {self.resp}',
+            f'Resp.: {self.resp}',
             (0, round(size*45)),
             font, size, color_text, thickness
         )
