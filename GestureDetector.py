@@ -33,22 +33,44 @@ def extract_features(data):
     mat = data.T @ data
     return mat.flatten()
 
+def timer_UI (img, dt):
+    # draw counter
+    h, w = img.shape[:2]
+    font = cv2.FONT_HERSHEY_DUPLEX
+    size = 10
+    textSize = cv2.getTextSize(str(dt), font, size, size)[0]
+    cv2.putText(
+        img,
+        str(dt),
+        (round((w - textSize[0])/2), round((h + textSize[1])/2)),
+        font, size, (255, 255, 255), size
+    )
+    return img
+
+def recording_UI (img):
+    # draw red circle
+    h, w = img.shape[:2]
+    radius = 15
+    cv2.circle(
+        img,
+        (w - (2*radius + 1), 2*radius + 1), radius, (0, 0, 255), 2*radius
+    )
+    return img
+
 #%%
 class GestureDetector:
     def __init__(
             self, gestures:list,
             train_path:str,
-            k:int = 7,
-            video: bool = True
+            k:int = 7
     ):
         self.gesture_name = gestures    # all gestures and their names
-        self.video = video
 
-        self.recording = False
+        self.status = "end"                     # current status of the recording
         self.start_time = time.time()
-        self.matrix = np.zeros((1,18))  # matrix with data from many frames
-        self.resp = '??'                # current awnser
-        self.logger = setup_logger(__name__)
+        self.matrix = np.zeros((1,18))          # matrix with data from many frames
+        self.resp = '??'                        # current awnser
+        self.logger = setup_logger(__name__)    # debug logger
 
         self.file_counter = {}
         self.name_order = [
@@ -72,33 +94,30 @@ class GestureDetector:
                 'WristL_Z'
             ]
 
-        # Criar classificador KNN com k = 5 (numero de vizinhos)
+        # KNN classifier with K neighbor
         self.knn_classifier = KNeighborsClassifier(n_neighbors=k, weights='distance', algorithm='auto')
 
+        # landmark skeleton
         self.skeleton = mp.solutions.pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
+        self.logger.info("Training Gestures")
         self.train_xlsx(train_path) # train KNN
         return
     
-    def cap_landmarks (self, frame):
+    def process_frame(self, img):
+        
+        # prints results
+        img = self.print_data(img)
 
-        #  # RECOLOR IMAGE TO RGB
-        # image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        # image.flags.writeable = False
-        # # get skeleton from frame
-        self.detection = self.skeleton.process(frame)
-        # # RECOLOR BACK TO BGR
-        # image.flags.writeable = True
-        # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-
-        # simplifications
+        # MAKE DETECTION
         try:
+            self.detection = self.skeleton.process(img)
+            img = self.print_skeleton(img)
+
+            # simplifications
             landmark = self.detection.pose_landmarks.landmark
             m = mp.solutions.pose.PoseLandmark
-        except:
-            return 0
-        
-        memb = [
+            memb = [
             m.RIGHT_SHOULDER,
             m.LEFT_SHOULDER,
             m.RIGHT_ELBOW,
@@ -106,47 +125,49 @@ class GestureDetector:
             m.RIGHT_WRIST,
             m.LEFT_WRIST
         ]
-
+        except:
+            return img
+        
         # reference
         nose = np.array([landmark[m.NOSE].x, landmark[m.NOSE].y, landmark[m.NOSE].z])
         
-        # return formated data
-        return np.array([
+        # formated data of current frame
+        vector = np.array([
             np.array([
                 np.array([landmark[i].x, landmark[i].y, landmark[i].z]) - nose for i in memb
             ]).flatten()
         ])
-    
-    def process_frame(self, img):
 
-        # MAKE DETECTION
-        vector = self.cap_landmarks(img)  # vector of current frame
-        
-        # prints results
-        if self.video:
-            img = self.print_data(img)
-        try:
-            if not self.recording:
+        match self.status:
+            case "end":
+                # calculates gesture to iniciate recording
                 angle = calculate_angle(vector[0,3:5], vector[0,9:11], vector[0,15:17])
-
+                
                 if angle < 70 and vector[0,16] < vector[0,4]:
-                    self.recording = True   # ready for recording
-                    self.logger.info("Record Starts")
-                    #time.sleep(3)
+                    self.status = "wait"
                     self.start_time = time.time()
 
-            elif self.recording and time.time() - self.start_time < 2:
-                # records for 2 seconds
-                self.matrix = np.concatenate((self.matrix,vector),0)
+            case "wait":
+                # preparetion time for the recording
+                timer = round(self.start_time + 3 - time.time())
+                if timer > 0:
+                    img = timer_UI(img, timer)  # draws timer 
+                else:
+                    self.status = "start"
+                    self.start_time = time.time()
 
-            else:
-                self.recording = False  # stops recoding
-                self.matrix = np.concatenate((self.matrix[1:, :],vector),0)
-                self.resp = self.classify_video(self.matrix)
-                self.logger.info("Record Ends")
-        except:
-            pass
-
+            case "start":
+                if time.time() - self.start_time < 2:
+                    # records for 2 seconds
+                    self.matrix = np.concatenate((self.matrix,vector),0)
+                    img = recording_UI(img)     # indicates that it's on air
+                else:
+                    self.status = "end"     # stop recording
+                    self.matrix = np.concatenate((self.matrix[1:, :],vector),0)
+                    self.resp = self.classify_video(self.matrix)
+                    if self.resp == "I":
+                        self.matrix = np.zeros((1,18))
+            
         return img
 
     def record (self, video_path:str = 0):
@@ -169,7 +190,7 @@ class GestureDetector:
             cv2.imshow('Output', image)
 
             # resets matrix
-            if not self.recording:
+            if self.status == 'end':
                 self.reset_pred()
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -188,33 +209,35 @@ class GestureDetector:
         self.resp = "??"
         return
 
-    def print_data (self, image):
+    def print_skeleton (self, image):
         # print parameters
-        font = cv2.FONT_HERSHEY_DUPLEX
-        size = 0.7
-        color_text = (0, 255, 0)
         color_1 = (145, 45, 30)
         color_2 = (0, 0, 245)
         thickness = 1
         circular_radius = 2
 
-        try:
-            # RENDER DETECTIONS
-            mp.solutions.drawing_utils.draw_landmarks(
-                image,
-                self.detection.pose_landmarks,
-                mp.solutions.pose.POSE_CONNECTIONS,
-                mp.solutions.drawing_utils.DrawingSpec(
-                    color=color_1,
-                    thickness=thickness,
-                    circle_radius=circular_radius),
-                mp.solutions.drawing_utils.DrawingSpec(
-                    color=color_2,
-                    thickness=thickness,
-                    circle_radius=circular_radius)
-            )
-        except:
-            pass
+        # RENDER DETECTIONS
+        mp.solutions.drawing_utils.draw_landmarks(
+            image,
+            self.detection.pose_landmarks,
+            mp.solutions.pose.POSE_CONNECTIONS,
+            mp.solutions.drawing_utils.DrawingSpec(
+                color=color_1,
+                thickness=thickness,
+                circle_radius=circular_radius),
+            mp.solutions.drawing_utils.DrawingSpec(
+                color=color_2,
+                thickness=thickness,
+                circle_radius=circular_radius)
+        )
+        return image
+
+    def print_data (self, image):
+        # print parameters
+        font = cv2.FONT_HERSHEY_DUPLEX
+        size = 0.7
+        color_text = (0, 255, 0)
+        thickness = 1
 
         # render results
         cv2.putText(
@@ -287,16 +310,16 @@ class GestureDetector:
         self.MC.great_analysis()
         return
 
-    def saves_to_dataBase (self, resp):
+    def saves_to_dataBase (self):
         # Salvar o arquivo 
-        file_name = f"Base_de_dados/{resp}/{resp}_{self.file_counter[resp]+1:02d}.xlsx"
-        self.file_counter[resp] = self.file_counter[resp]+1     # adds to the file counter
+        file_name = f"Base_de_dados/{self.resp}/{self.resp}_{self.file_counter[self.resp]+1:02d}rafa.xlsx"
+        self.file_counter[self.resp] = self.file_counter[self.resp]+1     # adds to the file counter
         
         # organizes and saves
         df = pd.DataFrame(self.matrix, columns= self.name_order)
         df.to_excel(file_name, index=False, engine='openpyxl')
 
-        self.logger.info(f"File {file_name} saved sucessefuly!")
+        self.logger.info(f"DataSet {file_name} saved sucessefuly!")
 
         # resets matrix 
         self.reset_pred()

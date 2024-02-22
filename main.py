@@ -9,8 +9,7 @@ def main ():
         fp16 = False,
         num_faces = 1,
         train_path = 'Base_de_dados',
-        k = 7,
-        video = True
+        k = 7
     )
     emo.video(0)
 

@@ -55,6 +55,7 @@ class EmotionDetector:
             "bbox_right": [],
         }
 
+        self.logger.info("Training Emotions")
         self.face_model = self.load_face_model(backend_option)
         self.emotion_model = self.load_trained_model(
             f"models/{model_name}",

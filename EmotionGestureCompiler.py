@@ -17,16 +17,16 @@ class EmotionGestureCompiler:
         fp16: bool = False,
         num_faces: int = 1,
         train_path: str = 'Base_de_dados',
-        k : int = 7,
-        video: bool = True
+        k : int = 7
     ):
         self.gestures_list = ['A', 'B', 'C', 'D', 'E']
         self.emotions_list = {0: "BAD", 1: "GOOD", 2: "NEUTRAL"}
 
-        self.logger = setup_logger(__name__)
+        self.logger = setup_logger(__name__)    # debug logger
         
+        # gesture and emotion inicialization
         self.Emotion = EmotionDetector(model_name, model_option, backend_option, providers, fp16, num_faces)
-        self.Gesture = GestureDetector(self.gestures_list, train_path, k, video)
+        self.Gesture = GestureDetector(self.gestures_list, train_path, k)
 
         return
     
@@ -99,23 +99,28 @@ class EmotionGestureCompiler:
         while success:
 
             try:
-                img, emotion = self.get_emotion(img)    # captures emotion
-
                 if not self.Gesture.resp in self.gestures_list:
                     img = self.Gesture.process_frame(img)   # captures gesture
+                    counter = {"GOOD" : 10, "BAD" : 10}   # creates and resets confirm counter
 
-                else:
+                else:   # enters when a valid gesture is captured
+                    img, emotion = self.get_emotion(img)    # captures emotion
+                    img = self.Gesture.print_data(img)
+
                     # match predictions at will
                     match self.emotions_list[emotion]:
                         case "GOOD":        # confirms prediction
-                            #self.Gesture.saves_to_dataBase()
-                            print("BOM GAROTO")
-                            self.Gesture.reset_pred()
+                            counter["GOOD"] -= 1
+                            if counter["GOOD"] < 1:
+                                self.Gesture.saves_to_dataBase()
+                            counter["BAD"] = 10     # reset other counter
 
                         case "BAD":         # rejects prediction
-                            self.Gesture.reset_pred()
-                            print("MAU GAROTO")
-
+                            counter["BAD"] -= 1
+                            if counter["BAD"] < 1:
+                                self.logger.info("DataSet Rejected")
+                                self.Gesture.reset_pred()
+                            counter["GOOD"] = 10    # reset other counter
 
                 cv2.imshow("Capturing", img)   # draw image
                 if cv2.waitKey(1) & 0xFF == ord("q"):
