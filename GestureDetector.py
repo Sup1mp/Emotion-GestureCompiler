@@ -312,7 +312,7 @@ class GestureDetector:
 
     def saves_to_dataBase (self):
         # Salvar o arquivo 
-        file_name = f"Base_de_dados/{self.resp}/{self.resp}_{self.file_counter[self.resp]+1:02d}rafa.xlsx"
+        file_name = f"Base_de_dados/{self.resp}/{self.resp}_{self.file_counter[self.resp]+1:02d}.xlsx"
         self.file_counter[self.resp] = self.file_counter[self.resp]+1     # adds to the file counter
         
         # organizes and saves
