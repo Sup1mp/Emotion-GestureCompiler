@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import torch
+import time
 
 from emotion_detector import EmotionDetector
 from GestureDetector import GestureDetector
@@ -97,30 +98,33 @@ class EmotionGestureCompiler:
 
         # starts video
         while success:
-
             try:
                 if not self.Gesture.resp in self.gestures_list:
                     img = self.Gesture.process_frame(img)   # captures gesture
-                    counter = {"GOOD" : 10, "BAD" : 10}   # creates and resets confirm counter
-
+                    #counter = {"GOOD" : 0, "BAD" : 0, "NEUTRAL" : 0}       # creates and resets counter
+                    #counter = {"GOOD" : False, "BAD" : False, "NEUTRAL" : False}       # creates and resets counter
+                    
                 else:   # enters when a valid gesture is captured
                     img, emotion = self.get_emotion(img)    # captures emotion
                     img = self.Gesture.print_data(img)
 
-                    # match predictions at will
-                    match self.emotions_list[emotion]:
-                        case "GOOD":        # confirms prediction
-                            counter["GOOD"] -= 1
-                            if counter["GOOD"] < 1:
-                                self.Gesture.saves_to_dataBase()
-                            counter["BAD"] = 10     # reset other counter
+                    if emotion == "GOOD":
+                        bad_timer = time.time()
 
-                        case "BAD":         # rejects prediction
-                            counter["BAD"] -= 1
-                            if counter["BAD"] < 1:
-                                self.logger.info("DataSet Rejected")
-                                self.Gesture.reset_pred()
-                            counter["GOOD"] = 10    # reset other counter
+                    elif emotion == "BAD":
+                        good_timer = time.time()
+
+                    else:
+                        good_timer = time.time()
+                        bad_timer = time.time()
+
+                    if good_timer + 5 - time.time() <= 0 or bad_timer + 5 - time.time() <= 0:
+
+                        if good_timer < bad_timer:
+                            self.Gesture.saves_to_dataBase()
+                        else:
+                            self.logger.info("DataSet Rejected")
+                            self.Gesture.reset_pred()
 
                 cv2.imshow("Capturing", img)   # draw image
                 if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -141,4 +145,14 @@ class EmotionGestureCompiler:
         cap.release()
         cv2.destroyAllWindows()
         return
-
+if __name__ == "__main__":
+    b = [lambda: print("sa"), lambda: print(), lambda: print("ju")]
+    a = [0, 0, 0]
+    print(a)
+    a[0] = 3
+    a[1] = 1
+    a[2] = 5
+    m = max(a)
+    print(m)
+    print(b[a.index(m)])
+    

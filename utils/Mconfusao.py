@@ -91,7 +91,7 @@ class Mconfusao:
         print(self.statistics.applymap(lambda x: round(x, 3)))
         return
 
-    def render(self, type = 'abs'):
+    def render(self, tipe = 'abs'):
         """
         type:   abs = valores absolutos
                 per = valores percentuais
@@ -99,11 +99,10 @@ class Mconfusao:
         
         self.analytics()
 
-        match(type):
-            case 'abs':
+        if tipe == 'abs':
                 # visualização da matriz de confusão absoluta
                 print(self.matriz)
-            case 'per':
+        if tipe == 'per':
                 # renderização percentual
                 print(self.matriz.applymap(lambda x: round(x/self.total, 3)))
         

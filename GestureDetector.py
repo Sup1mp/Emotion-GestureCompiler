@@ -138,35 +138,34 @@ class GestureDetector:
             ]).flatten()
         ])
 
-        match self.status:
-            case "end":
-                # calculates gesture to iniciate recording
-                angle = calculate_angle(vector[0,3:5], vector[0,9:11], vector[0,15:17])
-                
-                if angle < 70 and vector[0,16] < vector[0,4]:
-                    self.status = "wait"
-                    self.start_time = time.time()
+        if self.status == "end":
+            # calculates gesture to iniciate recording
+            angle = calculate_angle(vector[0,3:5], vector[0,9:11], vector[0,15:17])
+            
+            if angle < 70 and vector[0,16] < vector[0,4]:
+                self.status = "wait"
+                self.start_time = time.time()
 
-            case "wait":
-                # preparetion time for the recording
-                timer = round(self.start_time + 3 - time.time())
-                if timer > 0:
-                    img = timer_UI(img, timer)  # draws timer 
-                else:
-                    self.status = "start"
-                    self.start_time = time.time()
+        elif self.status == "wait":
+            # preparetion time for the recording
+            timer = round(self.start_time + 3 - time.time())
+            if timer > 0:
+                img = timer_UI(img, timer)  # draws timer 
+            else:
+                self.status = "start"
+                self.start_time = time.time()
 
-            case "start":
-                if time.time() - self.start_time < 2:
-                    # records for 2 seconds
-                    self.matrix = np.concatenate((self.matrix,vector),0)
-                    img = recording_UI(img)     # indicates that it's on air
-                else:
-                    self.status = "end"     # stop recording
-                    self.matrix = np.concatenate((self.matrix[1:, :],vector),0)
-                    self.resp = self.classify_video(self.matrix)
-                    if self.resp == "I":
-                        self.matrix = np.zeros((1,18))
+        elif self.status == "start":    # start recording
+            if time.time() - self.start_time < 2:
+                # records for 2 seconds
+                self.matrix = np.concatenate((self.matrix,vector),0)
+                img = recording_UI(img)     # indicates that it's on air
+            else:
+                self.status = "end"     # stop recording
+                self.matrix = np.concatenate((self.matrix[1:, :],vector),0)
+                self.resp = self.classify_video(self.matrix)
+                if self.resp == "I":    # deletes dataSet if matrix was not classified 
+                    self.matrix = np.zeros((1,18))
             
         return img
 
