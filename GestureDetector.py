@@ -62,14 +62,17 @@ class GestureDetector:
     def __init__(
             self, gestures:list,
             train_path:str,
+            database_path:str,
             k:int = 7
     ):
-        self.gesture_name = gestures    # all gestures and their names
+        self.gesture_name = gestures            # all gestures and their names
+        self.database_path = database_path      # where to store the DataSet
+        self.__makeDir__()                      # creates directories if they don't exists
 
         self.status = "end"                     # current status of the recording
         self.start_time = time.time()
         self.matrix = np.zeros((1,18))          # matrix with data from many frames
-        self.resp = '??'                        # current awnser
+        self.resp = '?'                         # current awnser
         self.logger = setup_logger(__name__)    # debug logger
 
         self.file_counter = {}
@@ -100,8 +103,14 @@ class GestureDetector:
         # landmark skeleton
         self.skeleton = mp.solutions.pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
-        self.logger.info("Training Gestures")
         self.train_xlsx(train_path) # train KNN
+        return
+    
+    def __makeDir__ (self):
+        if not os.path.isdir(self.database_path):
+            os.makedirs(self.database_path)     # creates folder for the dataBase if it doesn't exists
+            for gest in self.gesture_name:
+                os.makedirs(f"{self.database_path}/{gest}")     # creates folder for each gesture
         return
     
     def process_frame(self, img):
@@ -205,7 +214,7 @@ class GestureDetector:
     
     def reset_pred (self):
         self.matrix = np.zeros((1,18))
-        self.resp = "??"
+        self.resp = "?"
         return
 
     def print_skeleton (self, image):
@@ -248,6 +257,7 @@ class GestureDetector:
         return image
     
     def train_xlsx (self, trainData_path: str):
+        self.logger.info("Training Gestures")
         subfiles = [f.path for f in os.scandir(trainData_path) if f.is_dir()]
         X = []  # train data
         Y = []  # target values
@@ -310,8 +320,8 @@ class GestureDetector:
         return
 
     def saves_to_dataBase (self):
-        # Salvar o arquivo 
-        file_name = f"Base_de_dados/{self.resp}/{self.resp}_{self.file_counter[self.resp]+1:02d}.xlsx"
+        # Salvar o arquivo
+        file_name = f"{self.database_path}/{self.resp}/{self.resp}_{self.file_counter[self.resp]+1:02d}.xlsx"
         self.file_counter[self.resp] = self.file_counter[self.resp]+1     # adds to the file counter
         
         # organizes and saves

@@ -11,6 +11,7 @@ from utils.utils import setup_logger
 class EmotionGestureCompiler:
     def __init__(
         self,
+        gestures:list,
         model_name: str = "resnet18.onnx",
         model_option: str = "onnx",
         backend_option: int = 0 if torch.cuda.is_available() else 1,
@@ -18,16 +19,17 @@ class EmotionGestureCompiler:
         fp16: bool = False,
         num_faces: int = 1,
         train_path: str = 'Base_de_dados',
+        database_path:str = 'Base_de_dados',
         k : int = 7
     ):
-        self.gestures_list = ['A', 'B', 'C', 'D', 'E']
+        self.gestures_list = gestures   #['A', 'B', 'C', 'D', 'E']
         self.emotions_list = {0: "BAD", 1: "GOOD", 2: "NEUTRAL"}
 
         self.logger = setup_logger(__name__)    # debug logger
         
         # gesture and emotion inicialization
         self.Emotion = EmotionDetector(model_name, model_option, backend_option, providers, fp16, num_faces)
-        self.Gesture = GestureDetector(self.gestures_list, train_path, k)
+        self.Gesture = GestureDetector(self.gestures_list, train_path, database_path, k)
 
         return
     
@@ -101,30 +103,28 @@ class EmotionGestureCompiler:
             try:
                 if not self.Gesture.resp in self.gestures_list:
                     img = self.Gesture.process_frame(img)   # captures gesture
-                    #counter = {"GOOD" : 0, "BAD" : 0, "NEUTRAL" : 0}       # creates and resets counter
-                    #counter = {"GOOD" : False, "BAD" : False, "NEUTRAL" : False}       # creates and resets counter
-                    
+                    counter = {"GOOD" : 0, "BAD" : 0, "NEUTRAL" : 0}       # creates and resets counter
+                    timer = time.time()
+
                 else:   # enters when a valid gesture is captured
                     img, emotion = self.get_emotion(img)    # captures emotion
                     img = self.Gesture.print_data(img)
 
-                    if emotion == "GOOD":
-                        bad_timer = time.time()
+                    if emotion in "GOODBADNEUTRAL":
+                        counter[emotion] += 1
 
-                    elif emotion == "BAD":
-                        good_timer = time.time()
-
-                    else:
-                        good_timer = time.time()
-                        bad_timer = time.time()
-
-                    if good_timer + 5 - time.time() <= 0 or bad_timer + 5 - time.time() <= 0:
-
-                        if good_timer < bad_timer:
+                    if timer + 3 - time.time() <= 0:
+                        if counter["GOOD"] > counter["BAD"] and counter["GOOD"] > counter["NEUTRAL"]:
                             self.Gesture.saves_to_dataBase()
-                        else:
+
+                        elif counter["BAD"] > counter["GOOD"] and counter["BAD"] > counter["NEUTRAL"]:
                             self.logger.info("DataSet Rejected")
                             self.Gesture.reset_pred()
+
+                        else:
+                            counter = {"GOOD" : 0, "BAD" : 0, "NEUTRAL" : 0}       # resets counter
+                            timer = time.time()
+                            
 
                 cv2.imshow("Capturing", img)   # draw image
                 if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -145,14 +145,3 @@ class EmotionGestureCompiler:
         cap.release()
         cv2.destroyAllWindows()
         return
-if __name__ == "__main__":
-    b = [lambda: print("sa"), lambda: print(), lambda: print("ju")]
-    a = [0, 0, 0]
-    print(a)
-    a[0] = 3
-    a[1] = 1
-    a[2] = 5
-    m = max(a)
-    print(m)
-    print(b[a.index(m)])
-    
